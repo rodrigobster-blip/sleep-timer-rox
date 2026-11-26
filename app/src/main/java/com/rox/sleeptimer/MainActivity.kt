@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,17 +26,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -62,9 +67,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -232,23 +239,24 @@ private fun SleepTimerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(RoxBackground)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .navigationBarsPadding() // Respeta la barra de flechas de Android
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 if (timerStatus.isRunning) {
                     Button(
                         onClick = onStopTimer,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
-                        shape = RoundedCornerShape(14.dp),
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = RoxDanger,
                             contentColor = RoxBackground
                         )
                     ) {
-                        Icon(Icons.Rounded.Stop, contentDescription = null)
+                        Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Detener temporizador", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Text("Detener temporizador", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 } else {
                     Button(
@@ -264,16 +272,16 @@ private fun SleepTimerScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
-                        shape = RoundedCornerShape(14.dp),
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = RoxAmber,
                             contentColor = RoxBackground
                         )
                     ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Iniciar bajada de volumen", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Text("Iniciar bajada de volumen", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }
@@ -282,24 +290,56 @@ private fun SleepTimerScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
+                .imePadding(),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Encabezado
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Sleep Timer Rox V1",
-                        style = MaterialTheme.typography.headlineSmall,
+                        text = "Sleep Timer Rox",
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = RoxTextPrimary
                     )
                     Text(
-                        text = "Sin publicidad · 100% sin conexión · Audio multimedia global",
+                        text = "Sin publicidad · 100% sin conexión · Audio multimedia",
                         style = MaterialTheme.typography.bodySmall,
                         color = RoxTextMuted
                     )
+                }
+            }
+
+            // Atajos rápidos de tiempo (15m, 30m, 45m, 60m)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val quickPresets = listOf(
+                        "15 min" to listOf(VolumeStep(1L, 8, 35), VolumeStep(2L, 15, 0)),
+                        "30 min" to listOf(VolumeStep(1L, 15, 40), VolumeStep(2L, 30, 0)),
+                        "45 min" to listOf(VolumeStep(1L, 20, 50), VolumeStep(2L, 35, 20), VolumeStep(3L, 45, 0)),
+                        "60 min" to listOf(VolumeStep(1L, 20, 60), VolumeStep(2L, 40, 30), VolumeStep(3L, 55, 10), VolumeStep(4L, 60, 0))
+                    )
+                    quickPresets.forEach { (label, presetSteps) ->
+                        OutlinedButton(
+                            onClick = {
+                                persistSteps(presetSteps)
+                                feedbackMessage = "Configuración rápida: $label"
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, RoxOutline)
+                        ) {
+                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = RoxAmber, maxLines = 1, softWrap = false)
+                        }
+                    }
                 }
             }
 
@@ -309,19 +349,19 @@ private fun SleepTimerScreen(
                     val remaining = (timerStatus.totalSeconds - timerStatus.elapsedSeconds).coerceAtLeast(0)
                     Card(
                         colors = CardDefaults.cardColors(containerColor = RoxSurfaceVariant),
-                        border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.45f)),
-                        shape = RoundedCornerShape(16.dp)
+                        border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "Temporizador activo (funciona con pantalla apagada)",
+                                text = "Temporizador activo (pantalla apagada OK)",
                                 color = RoxAmber,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
                             Row(
@@ -330,31 +370,31 @@ private fun SleepTimerScreen(
                                 verticalAlignment = Alignment.Bottom
                             ) {
                                 Column {
-                                    Text("Tiempo restante", color = RoxTextMuted, fontSize = 12.sp)
+                                    Text("Tiempo restante", color = RoxTextMuted, fontSize = 11.sp)
                                     Text(
                                         text = VolumeScheduleMath.formatDuration(remaining),
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 30.sp,
+                                        fontSize = 26.sp,
                                         color = RoxTextPrimary
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Volumen actual", color = RoxTextMuted, fontSize = 12.sp)
+                                    Text("Volumen actual", color = RoxTextMuted, fontSize = 11.sp)
                                     Text(
                                         text = "${timerStatus.currentVolumePercent}%",
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 30.sp,
+                                        fontSize = 26.sp,
                                         color = RoxAmber
                                     )
                                 }
                             }
                             if (timerStatus.nextStepMinute != null && timerStatus.nextStepVolume != null) {
                                 Text(
-                                    text = "Próximo tramo: minuto ${timerStatus.nextStepMinute} → ${timerStatus.nextStepVolume}%",
+                                    text = "Próximo: min ${timerStatus.nextStepMinute} ➜ ${timerStatus.nextStepVolume}%",
                                     color = RoxTextMuted,
-                                    fontSize = 13.sp
+                                    fontSize = 12.sp
                                 )
                             }
                         }
@@ -367,13 +407,13 @@ private fun SleepTimerScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = RoxSurface),
                     border = BorderStroke(1.dp, RoxOutline),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -381,21 +421,22 @@ private fun SleepTimerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("Volumen inicial (min 0)", color = RoxTextMuted, fontSize = 13.sp)
+                                Text("Volumen inicial (min 0)", color = RoxTextMuted, fontSize = 12.sp)
                                 Text(
                                     text = "$startVolumePercent%",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 28.sp,
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = RoxTextPrimary
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("Teléfono ahora", color = RoxTextMuted, fontSize = 12.sp)
+                                Text("Teléfono ahora", color = RoxTextMuted, fontSize = 11.sp)
                                 Text(
                                     text = "$deviceVolumePercent%",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 16.sp,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
                                     color = RoxAmber
                                 )
                             }
@@ -405,21 +446,22 @@ private fun SleepTimerScreen(
                             onClick = {
                                 val current = onRefreshDeviceVolume()
                                 startVolumePercent = current
-                                feedbackMessage = "Punto de partida fijado en $current% (volumen actual del teléfono)."
+                                feedbackMessage = "Fijado en $current% (volumen actual del teléfono)."
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                .height(38.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                             border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.6f))
                         ) {
-                            Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = RoxAmber)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Usar volumen actual", color = RoxTextPrimary, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = RoxAmber, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Usar volumen actual", color = RoxTextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
                         }
 
                         feedbackMessage?.let { msg ->
-                            Text(text = msg, color = RoxAmber, fontSize = 12.sp)
+                            Text(text = msg, color = RoxAmber, fontSize = 11.sp)
                         }
                     }
                 }
@@ -433,31 +475,40 @@ private fun SleepTimerScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Tramos [minuto, volumen]",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = RoxTextPrimary
+                        text = "Tramos de volumen",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = RoxTextPrimary,
+                        maxLines = 1
                     )
-                    TextButton(
+                    Button(
                         onClick = {
                             val nextId = (steps.maxOfOrNull { it.id } ?: 0L) + 1L
                             val lastMinute = steps.maxOfOrNull { it.minute } ?: 0
                             val lastVolume = steps.lastOrNull()?.volumePercent ?: startVolumePercent
                             val suggestedVolume = (lastVolume - 20).coerceAtLeast(0)
                             persistSteps(steps + VolumeStep(nextId, lastMinute + 15, suggestedVolume))
-                        }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RoxSurfaceVariant,
+                            contentColor = RoxAmber
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, tint = RoxAmber)
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Añadir tramo", color = RoxAmber)
+                        Text("Añadir", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                     }
                 }
             }
 
-            // Lista editable de [minuto, volumen]
-            items(steps, key = { it.id }) { step ->
+            // Lista editable de [minuto, volumen] (Compacta)
+            itemsIndexed(steps, key = { _, step -> step.id }) { index, step ->
                 StepRowEditor(
                     step = step,
+                    index = index,
                     canDelete = steps.size > 1,
                     onUpdate = { newMin, newVol ->
                         val updated = steps.map {
@@ -476,13 +527,13 @@ private fun SleepTimerScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = RoxSurface),
                     border = BorderStroke(1.dp, RoxOutline),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -490,7 +541,7 @@ private fun SleepTimerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Bajada gradual suave", color = RoxTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text("Bajada gradual suave", color = RoxTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                 Text(
                                     text = if (transitionMode == TransitionMode.GRADUAL) {
                                         "Reduce progresivamente entre cada tramo"
@@ -498,7 +549,7 @@ private fun SleepTimerScreen(
                                         "Cambia en escalón exacto al llegar al minuto"
                                     },
                                     color = RoxTextMuted,
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             }
                             Switch(
@@ -518,11 +569,11 @@ private fun SleepTimerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Pausar reproducción al final", color = RoxTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text("Pausar reproducción al final", color = RoxTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                 Text(
-                                    text = "Envía pausa a iVoox, YouTube o reproductores al terminar",
+                                    text = "Detiene la música o audio al llegar al minuto final",
                                     color = RoxTextMuted,
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             }
                             Switch(
@@ -538,11 +589,20 @@ private fun SleepTimerScreen(
                             HorizontalDivider(color = RoxOutline)
                             OutlinedButton(
                                 onClick = onRequestBatteryExemption,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 border = BorderStroke(1.dp, RoxOutline)
                             ) {
-                                Text("Permitir ejecución con pantalla apagada (sin ahorro batería)", fontSize = 12.sp, color = RoxTextPrimary)
+                                Text(
+                                    "Permitir en segundo plano (sin ahorro batería)",
+                                    fontSize = 11.sp,
+                                    color = RoxTextPrimary,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
                     }
@@ -558,14 +618,24 @@ private fun SleepTimerScreen(
                 ) {
                     Text(
                         text = "Configuraciones guardadas",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = RoxTextPrimary
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = RoxTextPrimary,
+                        maxLines = 1
                     )
-                    TextButton(onClick = { showSaveDialog = true }) {
-                        Icon(Icons.Rounded.Save, contentDescription = null, tint = RoxAmber)
+                    Button(
+                        onClick = { showSaveDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RoxSurfaceVariant,
+                            contentColor = RoxAmber
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Rounded.BookmarkAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Guardar actual", color = RoxAmber)
+                        Text("Guardar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -574,19 +644,19 @@ private fun SleepTimerScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = RoxSurface),
                     border = BorderStroke(1.dp, RoxOutline),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(preset.name, color = RoxTextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                            val summary = preset.steps.joinToString(" · ") { "${it.minute}m → ${it.volumePercent}%" }
-                            Text(summary, color = RoxTextMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                            Text(preset.name, color = RoxTextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                            val summary = preset.steps.joinToString(" · ") { "${it.minute}m ➜ ${it.volumePercent}%" }
+                            Text(summary, color = RoxTextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(
@@ -596,26 +666,26 @@ private fun SleepTimerScreen(
                                     pauseAtEnd = preset.pauseAtEnd
                                     storage.saveTransitionMode(preset.transitionMode)
                                     storage.savePauseAtEnd(preset.pauseAtEnd)
-                                    feedbackMessage = "Configuración cargada: ${preset.name}"
-                                }
+                                    feedbackMessage = "Cargado: ${preset.name}"
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                             ) {
-                                Text("Cargar", color = RoxAmber)
+                                Text("Cargar", color = RoxAmber, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                             IconButton(
                                 onClick = {
                                     val updated = presets.filterNot { it.id == preset.id }
                                     presets = updated
                                     storage.savePresets(updated)
-                                }
+                                },
+                                modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Rounded.Delete, contentDescription = "Borrar", tint = RoxTextMuted)
+                                Icon(Icons.Rounded.Delete, contentDescription = "Borrar", tint = RoxTextMuted, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
                 }
             }
-
-            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 
@@ -623,12 +693,12 @@ private fun SleepTimerScreen(
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
             containerColor = RoxSurface,
-            title = { Text("Guardar configuración", color = RoxTextPrimary) },
+            title = { Text("Guardar configuración", color = RoxTextPrimary, fontSize = 16.sp) },
             text = {
                 OutlinedTextField(
                     value = presetNameInput,
                     onValueChange = { presetNameInput = it },
-                    label = { Text("Nombre (ej. Noche iVoox)") },
+                    label = { Text("Nombre (ej. Mi descanso 40 min)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -650,12 +720,12 @@ private fun SleepTimerScreen(
                             storage.savePresets(updated)
                             presetNameInput = ""
                             showSaveDialog = false
-                            feedbackMessage = "Configuración guardada: $trimmed"
+                            feedbackMessage = "Guardado: $trimmed"
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RoxAmber, contentColor = RoxBackground)
                 ) {
-                    Text("Guardar")
+                    Text("Guardar", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -670,6 +740,7 @@ private fun SleepTimerScreen(
 @Composable
 private fun StepRowEditor(
     step: VolumeStep,
+    index: Int,
     canDelete: Boolean,
     onUpdate: (Int, Int) -> Unit,
     onDelete: () -> Unit
@@ -680,17 +751,27 @@ private fun StepRowEditor(
     Card(
         colors = CardDefaults.cardColors(containerColor = RoxSurface),
         border = BorderStroke(1.dp, RoxOutline),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
+            Text(
+                text = "T${index + 1}",
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = RoxAmber,
+                modifier = Modifier.width(22.dp)
+            )
+
+            // Campo Minuto compacto
+            CompactNumberBox(
                 value = minuteText,
+                suffix = "min",
                 onValueChange = { raw ->
                     val digits = raw.filter { it.isDigit() }.take(3)
                     minuteText = digits
@@ -698,14 +779,15 @@ private fun StepRowEditor(
                         if (parsed >= 1) onUpdate(parsed, step.volumePercent)
                     }
                 },
-                label = { Text("Minuto", fontSize = 11.sp) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f)
             )
 
-            OutlinedTextField(
+            Text("➜", color = RoxTextMuted, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+            // Campo Volumen compacto
+            CompactNumberBox(
                 value = volumeText,
+                suffix = "%",
                 onValueChange = { raw ->
                     val digits = raw.filter { it.isDigit() }.take(3)
                     volumeText = digits
@@ -713,22 +795,61 @@ private fun StepRowEditor(
                         onUpdate(step.minute, parsed.coerceIn(0, 100))
                     }
                 },
-                label = { Text("Volumen %", fontSize = 11.sp) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f)
             )
 
             IconButton(
                 onClick = onDelete,
-                enabled = canDelete
+                enabled = canDelete,
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Delete,
                     contentDescription = "Borrar tramo",
-                    tint = if (canDelete) RoxDanger else RoxOutline
+                    tint = if (canDelete) RoxDanger else RoxOutline.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CompactNumberBox(
+    value: String,
+    suffix: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(38.dp)
+            .background(RoxSurfaceVariant, RoundedCornerShape(8.dp))
+            .border(1.dp, RoxOutline, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(
+                color = RoxTextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
+            ),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = suffix,
+            color = RoxTextMuted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }

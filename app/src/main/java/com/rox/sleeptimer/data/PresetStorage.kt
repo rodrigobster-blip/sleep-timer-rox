@@ -113,40 +113,40 @@ class PresetStorage(context: Context) {
     )
 
     private fun defaultPresets(): List<TimerPreset> = listOf(
-            TimerPreset(
-                id = "preset-ivoox-45",
-                name = "Pódcast iVoox 45 min",
-                transitionMode = TransitionMode.GRADUAL,
-                pauseAtEnd = true,
-                steps = listOf(
-                    VolumeStep(1L, 15, 45),
-                    VolumeStep(2L, 30, 20),
-                    VolumeStep(3L, 45, 0)
-                )
-            ),
-            TimerPreset(
-                id = "preset-youtube-20",
-                name = "YouTube rápido 20 min",
-                transitionMode = TransitionMode.STEP,
-                pauseAtEnd = true,
-                steps = listOf(
-                    VolumeStep(1L, 10, 35),
-                    VolumeStep(2L, 20, 0)
-                )
-            ),
-            TimerPreset(
-                id = "preset-sueno-60",
-                name = "Descanso profundo 60 min",
-                transitionMode = TransitionMode.GRADUAL,
-                pauseAtEnd = true,
-                steps = listOf(
-                    VolumeStep(1L, 20, 50),
-                    VolumeStep(2L, 40, 25),
-                    VolumeStep(3L, 55, 10),
-                    VolumeStep(4L, 60, 0)
-                )
+        TimerPreset(
+            id = "preset-30",
+            name = "Temporizador 30 min",
+            transitionMode = TransitionMode.GRADUAL,
+            pauseAtEnd = true,
+            steps = listOf(
+                VolumeStep(1L, 15, 40),
+                VolumeStep(2L, 30, 0)
+            )
+        ),
+        TimerPreset(
+            id = "preset-45",
+            name = "Temporizador 45 min",
+            transitionMode = TransitionMode.GRADUAL,
+            pauseAtEnd = true,
+            steps = listOf(
+                VolumeStep(1L, 20, 50),
+                VolumeStep(2L, 35, 20),
+                VolumeStep(3L, 45, 0)
+            )
+        ),
+        TimerPreset(
+            id = "preset-60",
+            name = "Temporizador 60 min",
+            transitionMode = TransitionMode.GRADUAL,
+            pauseAtEnd = true,
+            steps = listOf(
+                VolumeStep(1L, 20, 60),
+                VolumeStep(2L, 40, 30),
+                VolumeStep(3L, 55, 10),
+                VolumeStep(4L, 60, 0)
             )
         )
+    )
 
     companion object {
         private const val PREFS_NAME = "sleep_timer_rox_v1_prefs"
