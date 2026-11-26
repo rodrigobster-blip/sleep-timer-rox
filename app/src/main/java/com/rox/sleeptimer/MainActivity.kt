@@ -300,7 +300,7 @@ private fun SleepTimerScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Sleep Timer Rox",
+                        text = "Sleep Timer Rox V2",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = RoxTextPrimary
