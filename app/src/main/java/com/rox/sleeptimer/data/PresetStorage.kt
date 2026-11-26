@@ -38,6 +38,15 @@ class PresetStorage(context: Context) {
         prefs.edit().putBoolean(KEY_PAUSE_AT_END, pauseAtEnd).apply()
     }
 
+    fun loadLastStartVolume(): Int? {
+        if (!prefs.contains(KEY_LAST_START_VOLUME)) return null
+        return prefs.getInt(KEY_LAST_START_VOLUME, 60)
+    }
+
+    fun saveLastStartVolume(volume: Int) {
+        prefs.edit().putInt(KEY_LAST_START_VOLUME, volume.coerceIn(0, 100)).apply()
+    }
+
     fun loadPresets(): List<TimerPreset> {
         val raw = prefs.getString(KEY_PRESETS, null) ?: return defaultPresets()
         return runCatching {
@@ -154,5 +163,6 @@ class PresetStorage(context: Context) {
         private const val KEY_PRESETS = "saved_presets_json"
         private const val KEY_MODE = "transition_mode"
         private const val KEY_PAUSE_AT_END = "pause_at_end"
+        private const val KEY_LAST_START_VOLUME = "last_start_volume"
     }
 }

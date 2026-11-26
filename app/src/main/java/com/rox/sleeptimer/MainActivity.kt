@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -56,6 +57,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -127,9 +130,11 @@ class MainActivity : ComponentActivity() {
                     isBatteryExempt = batteryExemptState.value,
                     storage = storage,
                     onRefreshDeviceVolume = { readCurrentMediaVolumePercent() },
+                    onApplyLiveVolume = { percent -> applyMediaVolume(percent) },
                     onStartTimer = { startVol, steps, mode, pauseAtEnd ->
                         startTimerService(startVol, steps, mode, pauseAtEnd)
                     },
+                    onExtendTimer = { extraSeconds -> extendTimerService(extraSeconds) },
                     onStopTimer = { stopTimerService() },
                     onRequestBatteryExemption = { openBatteryExemptionPrompt() }
                 )
@@ -156,6 +161,13 @@ class MainActivity : ComponentActivity() {
         return ((current.toDouble() / max.toDouble()) * 100.0).roundToInt().coerceIn(0, 100)
     }
 
+    private fun applyMediaVolume(percent: Int) {
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val targetIndex = ((percent.coerceIn(0, 100) / 100.0) * max).roundToInt().coerceIn(0, max)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetIndex, 0)
+        deviceVolumePercentState.intValue = readCurrentMediaVolumePercent()
+    }
+
     private fun startTimerService(
         startVolumePercent: Int,
         steps: List<VolumeStep>,
@@ -170,6 +182,14 @@ class MainActivity : ComponentActivity() {
             putExtra(VolumeTimerService.EXTRA_PAUSE_AT_END, pauseAtEnd)
         }
         ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun extendTimerService(extraSeconds: Int) {
+        val intent = Intent(this, VolumeTimerService::class.java).apply {
+            action = VolumeTimerService.ACTION_EXTEND
+            putExtra(VolumeTimerService.EXTRA_EXTEND_SECONDS, extraSeconds)
+        }
+        startService(intent)
     }
 
     private fun stopTimerService() {
@@ -212,13 +232,17 @@ private fun SleepTimerScreen(
     isBatteryExempt: Boolean,
     storage: PresetStorage,
     onRefreshDeviceVolume: () -> Int,
+    onApplyLiveVolume: (Int) -> Unit,
     onStartTimer: (Int, List<VolumeStep>, TransitionMode, Boolean) -> Unit,
+    onExtendTimer: (Int) -> Unit,
     onStopTimer: () -> Unit,
     onRequestBatteryExemption: () -> Unit
 ) {
     val timerStatus by VolumeTimerService.status.collectAsState()
 
-    var startVolumePercent by remember { mutableIntStateOf(deviceVolumePercent) }
+    var startVolumePercent by remember {
+        mutableIntStateOf(storage.loadLastStartVolume() ?: deviceVolumePercent)
+    }
     var steps by remember { mutableStateOf(storage.loadActiveSteps()) }
     var transitionMode by remember { mutableStateOf(storage.loadTransitionMode()) }
     var pauseAtEnd by remember { mutableStateOf(storage.loadPauseAtEnd()) }
@@ -267,6 +291,7 @@ private fun SleepTimerScreen(
                                 feedbackMessage = "Añade al menos un tramo válido."
                             } else {
                                 persistSteps(sorted)
+                                storage.saveLastStartVolume(startVolumePercent)
                                 feedbackMessage = null
                                 onStartTimer(startVolumePercent, sorted, transitionMode, pauseAtEnd)
                             }
@@ -344,7 +369,7 @@ private fun SleepTimerScreen(
                 }
             }
 
-            // Panel activo si está en marcha
+            // Panel activo si está en marcha con botones +5 min y +10 min
             if (timerStatus.isRunning) {
                 item {
                     val remaining = (timerStatus.totalSeconds - timerStatus.elapsedSeconds).coerceAtLeast(0)
@@ -357,7 +382,7 @@ private fun SleepTimerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = "Temporizador activo (pantalla apagada OK)",
@@ -398,12 +423,41 @@ private fun SleepTimerScreen(
                                     fontSize = 12.sp
                                 )
                             }
+
+                            // Botones para alargar tiempo en la cama (+5m / +10m)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { onExtendTimer(300) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.6f)),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("+5 min", color = RoxAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = { onExtendTimer(600) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.6f)),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("+10 min", color = RoxAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Tarjeta de volumen inicial + botón "Usar volumen actual"
+            // Tarjeta de volumen inicial con barra deslizante en tiempo real y +/-
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = RoxSurface),
@@ -414,7 +468,7 @@ private fun SleepTimerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -422,13 +476,13 @@ private fun SleepTimerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("Volumen inicial (min 0)", color = RoxTextMuted, fontSize = 12.sp)
+                                Text("Volumen inicial de partida", color = RoxTextMuted, fontSize = 12.sp)
                                 Text(
                                     text = "$startVolumePercent%",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = RoxTextPrimary
+                                    color = RoxAmber
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
@@ -438,8 +492,58 @@ private fun SleepTimerScreen(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = RoxAmber
+                                    color = RoxTextPrimary
                                 )
+                            }
+                        }
+
+                        // Slider en tiempo real con botones [-] y [+]
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val newVol = (startVolumePercent - 5).coerceIn(0, 100)
+                                    startVolumePercent = newVol
+                                    onApplyLiveVolume(newVol)
+                                    storage.saveLastStartVolume(newVol)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Rounded.Remove, contentDescription = "Menos volumen", tint = RoxAmber, modifier = Modifier.size(18.dp))
+                            }
+
+                            Slider(
+                                value = startVolumePercent.toFloat(),
+                                onValueChange = { floatVal ->
+                                    val newVol = floatVal.roundToInt()
+                                    startVolumePercent = newVol
+                                    onApplyLiveVolume(newVol)
+                                },
+                                onValueChangeFinished = {
+                                    storage.saveLastStartVolume(startVolumePercent)
+                                },
+                                valueRange = 0f..100f,
+                                modifier = Modifier.weight(1f),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = RoxAmber,
+                                    activeTrackColor = RoxAmber,
+                                    inactiveTrackColor = RoxOutline
+                                )
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    val newVol = (startVolumePercent + 5).coerceIn(0, 100)
+                                    startVolumePercent = newVol
+                                    onApplyLiveVolume(newVol)
+                                    storage.saveLastStartVolume(newVol)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = "Más volumen", tint = RoxAmber, modifier = Modifier.size(18.dp))
                             }
                         }
 
@@ -447,18 +551,19 @@ private fun SleepTimerScreen(
                             onClick = {
                                 val current = onRefreshDeviceVolume()
                                 startVolumePercent = current
+                                storage.saveLastStartVolume(current)
                                 feedbackMessage = "Fijado en $current% (volumen actual del teléfono)."
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(38.dp),
+                                .height(36.dp),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                             border = BorderStroke(1.dp, RoxAmber.copy(alpha = 0.6f))
                         ) {
                             Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = RoxAmber, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Usar volumen actual", color = RoxTextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                            Text("Usar volumen actual del teléfono", color = RoxTextPrimary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
                         }
 
                         feedbackMessage?.let { msg ->

@@ -46,6 +46,12 @@ class VolumeTimerService : Service() {
     private lateinit var audioManager: AudioManager
     private lateinit var notificationManager: NotificationManager
 
+    private var activeSteps: List<VolumeStep> = emptyList()
+    private var activeTotalSeconds: Int = 0
+    private var activeMode: TransitionMode = TransitionMode.GRADUAL
+    private var activePauseAtEnd: Boolean = true
+    private var activeStartVolume: Int = 50
+
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -57,6 +63,12 @@ class VolumeTimerService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 stopTimerAndService(finishedNormally = false)
+                return START_NOT_STICKY
+            }
+
+            ACTION_EXTEND -> {
+                val extraSec = intent.getIntExtra(EXTRA_EXTEND_SECONDS, 600)
+                extendSchedule(extraSec)
                 return START_NOT_STICKY
             }
 
@@ -84,6 +96,21 @@ class VolumeTimerService : Service() {
         return START_NOT_STICKY
     }
 
+    private fun extendSchedule(extraSec: Int) {
+        if (!_status.value.isRunning || activeSteps.isEmpty()) return
+        val extraMin = (extraSec / 60).coerceAtLeast(1)
+        activeSteps = activeSteps.map { it.copy(minute = it.minute + extraMin) }
+        activeTotalSeconds += extraSec
+        acquireWakeLock(timeoutMillis = (activeTotalSeconds + 120L) * 1000L)
+        val current = _status.value
+        val updated = current.copy(
+            totalSeconds = activeTotalSeconds,
+            nextStepMinute = activeSteps.firstOrNull { it.minute * 60 > current.elapsedSeconds }?.minute
+        )
+        _status.value = updated
+        notificationManager.notify(NOTIFICATION_ID, buildNotification(updated))
+    }
+
     private fun startVolumeSchedule(
         startVolumePercent: Int,
         steps: List<VolumeStep>,
@@ -95,6 +122,12 @@ class VolumeTimerService : Service() {
 
         val sortedSteps = steps.filter { it.minute > 0 }.sortedBy { it.minute }
         val totalSeconds = sortedSteps.last().minute * 60
+
+        activeSteps = sortedSteps
+        activeTotalSeconds = totalSeconds
+        activeMode = mode
+        activePauseAtEnd = pauseAtEnd
+        activeStartVolume = startVolumePercent
 
         acquireWakeLock(timeoutMillis = (totalSeconds + 120L) * 1000L)
 
@@ -134,32 +167,35 @@ class VolumeTimerService : Service() {
             while (isActive) {
                 val elapsedMs = SystemClock.elapsedRealtime() - startElapsedRealtime
                 val elapsedSecondsDouble = elapsedMs / 1000.0
-                val elapsedSecInt = elapsedSecondsDouble.toInt().coerceAtMost(totalSeconds)
+                val currentTotal = activeTotalSeconds
+                val elapsedSecInt = elapsedSecondsDouble.toInt().coerceAtMost(currentTotal)
+
+                val currentSteps = activeSteps
 
                 val targetPercent = VolumeScheduleMath.computeVolumePercent(
                     elapsedSeconds = elapsedSecondsDouble,
-                    startVolumePercent = startVolumePercent,
-                    steps = sortedSteps,
-                    mode = mode
+                    startVolumePercent = activeStartVolume,
+                    steps = currentSteps,
+                    mode = activeMode
                 )
 
                 lastAppliedIndex = applyMediaVolumePercent(targetPercent, maxStreamVolume, lastAppliedIndex)
 
-                val nextStep = sortedSteps.firstOrNull { it.minute * 60 > elapsedSecInt }
+                val nextStep = currentSteps.firstOrNull { it.minute * 60 > elapsedSecInt }
                 val updatedStatus = TimerStatus(
                     isRunning = true,
-                    startVolumePercent = startVolumePercent,
+                    startVolumePercent = activeStartVolume,
                     currentVolumePercent = targetPercent,
                     elapsedSeconds = elapsedSecInt,
-                    totalSeconds = totalSeconds,
+                    totalSeconds = currentTotal,
                     nextStepMinute = nextStep?.minute,
                     nextStepVolume = nextStep?.volumePercent
                 )
                 _status.value = updatedStatus
                 notificationManager.notify(NOTIFICATION_ID, buildNotification(updatedStatus))
 
-                if (elapsedSecInt >= totalSeconds) {
-                    if (pauseAtEnd) {
+                if (elapsedSecInt >= currentTotal) {
+                    if (activePauseAtEnd) {
                         pauseActiveMediaPlayback()
                     }
                     stopTimerAndService(finishedNormally = true)
@@ -283,7 +319,7 @@ class VolumeTimerService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode_off)
-            .setContentTitle("Sleep Timer Rox V1 activo")
+            .setContentTitle("Sleep Timer Rox V2 activo")
             .setContentText(contentText)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -329,11 +365,13 @@ class VolumeTimerService : Service() {
     companion object {
         const val ACTION_START = "com.rox.sleeptimer.ACTION_START"
         const val ACTION_STOP = "com.rox.sleeptimer.ACTION_STOP"
+        const val ACTION_EXTEND = "com.rox.sleeptimer.ACTION_EXTEND"
 
         const val EXTRA_STEPS_JSON = "extra_steps_json"
         const val EXTRA_START_VOLUME = "extra_start_volume"
         const val EXTRA_MODE = "extra_mode"
         const val EXTRA_PAUSE_AT_END = "extra_pause_at_end"
+        const val EXTRA_EXTEND_SECONDS = "extra_extend_seconds"
 
         private const val CHANNEL_ID = "sleep_timer_rox_channel"
         private const val NOTIFICATION_ID = 1042
